@@ -286,6 +286,7 @@ export async function requeueReceipt(sortKey: string, at: Date): Promise<boolean
   }
 }
 
+// 같은 날 다시 실행되면 상태 건수는 새로 센 값으로 바꾸고, 재처리·격리 건수는 누적한다.
 export async function putSummary(
   day: string,
   counts: Record<string, number>,
@@ -294,17 +295,19 @@ export async function putSummary(
   at: Date,
 ): Promise<void> {
   await db().send(
-    new PutCommand({
+    new UpdateCommand({
       TableName: table(),
-      Item: {
-        inboxId: INBOX_ID,
-        sortKey: summaryKey(day),
-        day,
-        counts,
-        redriven,
-        quarantined,
-        summarizedAt: at.toISOString(),
-        expiresAt: expiry(at, retentionDays()),
+      Key: { inboxId: INBOX_ID, sortKey: summaryKey(day) },
+      UpdateExpression:
+        'SET #day = :day, counts = :counts, summarizedAt = :now, expiresAt = :expires ADD redriven :redriven, quarantined :quarantined',
+      ExpressionAttributeNames: { '#day': 'day' },
+      ExpressionAttributeValues: {
+        ':day': day,
+        ':counts': counts,
+        ':now': at.toISOString(),
+        ':expires': expiry(at, retentionDays()),
+        ':redriven': redriven,
+        ':quarantined': quarantined,
       },
     }),
   )
