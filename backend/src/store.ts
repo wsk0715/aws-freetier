@@ -27,6 +27,17 @@ export type ReceiptItem = {
   rawBody: string
   status: string
   receivedAt: string
+  failureReason?: string
+  requeueCount?: number
+  requeuedAt?: string
+}
+
+export type DailySummary = {
+  day: string
+  counts: Record<string, number>
+  redriven: number
+  quarantined: number
+  summarizedAt: string
 }
 
 export function requiredEnv(name: string): string {
@@ -221,7 +232,7 @@ export async function listReceipts(
     new QueryCommand({
       TableName: table(),
       KeyConditionExpression: 'inboxId = :inbox AND begins_with(sortKey, :prefix)',
-      ProjectionExpression: 'sortKey, rawBody, #status, receivedAt',
+      ProjectionExpression: 'sortKey, rawBody, #status, receivedAt, failureReason, requeueCount, requeuedAt',
       ExpressionAttributeNames: { '#status': 'status' },
       ExpressionAttributeValues: { ':inbox': INBOX_ID, ':prefix': 'rx#' },
       ScanIndexForward: false,
@@ -233,6 +244,45 @@ export async function listReceipts(
   return {
     items: (result.Items ?? []) as ReceiptItem[],
     ...(typeof last === 'string' ? { lastSortKey: last } : {}),
+  }
+}
+
+export async function listSummaries(limit: number): Promise<DailySummary[]> {
+  const result = await db().send(
+    new QueryCommand({
+      TableName: table(),
+      KeyConditionExpression: 'inboxId = :inbox AND begins_with(sortKey, :prefix)',
+      ProjectionExpression: '#day, counts, redriven, quarantined, summarizedAt',
+      ExpressionAttributeNames: { '#day': 'day' },
+      ExpressionAttributeValues: { ':inbox': INBOX_ID, ':prefix': 'sum#' },
+      ScanIndexForward: false,
+      Limit: limit,
+    }),
+  )
+  return (result.Items ?? []) as DailySummary[]
+}
+
+export async function requeueReceipt(sortKey: string, at: Date): Promise<boolean> {
+  try {
+    await db().send(
+      new UpdateCommand({
+        TableName: table(),
+        Key: { inboxId: INBOX_ID, sortKey },
+        UpdateExpression: 'SET #status = :received, requeuedAt = :now ADD requeueCount :one',
+        ConditionExpression: 'attribute_exists(sortKey) AND #status = :quarantined',
+        ExpressionAttributeNames: { '#status': 'status' },
+        ExpressionAttributeValues: {
+          ':received': '수신됨',
+          ':quarantined': '격리',
+          ':now': at.toISOString(),
+          ':one': 1,
+        },
+      }),
+    )
+    return true
+  } catch (error) {
+    if (error instanceof ConditionalCheckFailedException) return false
+    throw error
   }
 }
 
