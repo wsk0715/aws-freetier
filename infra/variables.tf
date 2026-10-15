@@ -51,8 +51,8 @@ variable "dynamodb_read_capacity" {
   default     = 5
 }
 
-variable "github_repository" {
-  description = "수신함 UI를 배포하는 GitHub 저장소 (소유자/이름)."
+variable "github_oidc_subject_prefix" {
+  description = "배포 저장소의 OIDC sub 접두사. immutable subject를 쓰는 저장소는 소유자·저장소 ID가 붙으며, GitHub API repos/{owner}/{repo}/actions/oidc/customization/sub의 sub_claim_prefix 값이다."
   type        = string
-  default     = "wsk0715/aws-freetier"
+  default     = "repo:wsk0715@58899677/aws-freetier@1420232275"
 }
