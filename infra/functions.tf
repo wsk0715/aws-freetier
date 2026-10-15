@@ -183,8 +183,9 @@ resource "aws_lambda_function" "query" {
 
   environment {
     variables = {
-      INBOX_TABLE = aws_dynamodb_table.inbox.name
-      QUERY_TOKEN = var.query_token
+      INBOX_TABLE    = aws_dynamodb_table.inbox.name
+      QUERY_TOKEN    = var.query_token
+      WORK_QUEUE_URL = aws_sqs_queue.work.url
     }
   }
 
@@ -198,7 +199,7 @@ resource "aws_lambda_function_url" "query" {
   cors {
     allow_credentials = false
     allow_headers     = ["content-type", "x-inbox-token"]
-    allow_methods     = ["GET"]
+    allow_methods     = ["GET", "POST"]
     allow_origins     = [var.allowed_origin != "" ? var.allowed_origin : "https://${aws_cloudfront_distribution.site.domain_name}"]
     max_age           = 300
   }
