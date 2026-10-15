@@ -1,0 +1,36 @@
+packages:
+  - backend
+  - frontend
+allowBuilds:
+  esbuild: true
+minimumReleaseAgeExclude:
+  - '@aws-sdk/client-dynamodb@3.1150.0'
+  - '@aws-sdk/client-sns@3.1150.0'
+  - '@aws-sdk/client-sqs@3.1150.0'
+  - '@aws-sdk/core@3.978.3'
+  - '@aws-sdk/credential-provider-env@3.972.74'
+  - '@aws-sdk/credential-provider-http@3.972.76'
+  - '@aws-sdk/credential-provider-ini@3.973.19'
+  - '@aws-sdk/credential-provider-login@3.972.81'
+  - '@aws-sdk/credential-provider-node@3.972.86'
+  - '@aws-sdk/credential-provider-process@3.972.74'
+  - '@aws-sdk/credential-provider-sso@3.973.18'
+  - '@aws-sdk/credential-provider-web-identity@3.972.80'
+  - '@aws-sdk/dynamodb-codec@3.973.48'
+  - '@aws-sdk/lib-dynamodb@3.1150.0'
+  - '@aws-sdk/nested-clients@3.997.48'
+  - '@aws-sdk/token-providers@3.1150.0'
+  - '@typescript-eslint/eslint-plugin@8.71.2'
+  - '@typescript-eslint/parser@8.71.2'
+  - '@typescript-eslint/project-service@8.71.2'
+  - '@typescript-eslint/scope-manager@8.71.2'
+  - '@typescript-eslint/tsconfig-utils@8.71.2'
+  - '@typescript-eslint/type-utils@8.71.2'
+  - '@typescript-eslint/types@8.71.2'
+  - '@typescript-eslint/typescript-estree@8.71.2'
+  - '@typescript-eslint/utils@8.71.2'
+  - '@typescript-eslint/visitor-keys@8.71.2'
+  - '@vitest/mocker@5.0.4'
+  - '@vitest/spy@5.0.4'
+  - typescript-eslint@8.71.2
+  - vitest@5.0.4

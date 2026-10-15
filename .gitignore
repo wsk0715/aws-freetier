@@ -1,0 +1,17 @@
+node_modules/
+dist/
+
+# 환경별 값과 비밀값. 예시 파일만 추적한다.
+.env
+.env.*
+!.env.example
+*.tfvars
+!*.tfvars.example
+
+# Terraform 상태에는 민감 변수 값이 평문으로 남는다.
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+infra/build/
+crash.log
+crash.*.log

@@ -1,0 +1,17 @@
+{
+  "name": "webhook-inbox",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "pnpm --filter backend build && pnpm --filter frontend build",
+    "typecheck": "pnpm -r --if-present typecheck",
+    "test": "pnpm -r --if-present test",
+    "lint": "eslint ."
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.12.0",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.71.2"
+  }
+}
