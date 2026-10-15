@@ -153,8 +153,14 @@ resource "aws_iam_role" "query" {
 data "aws_iam_policy_document" "query" {
   statement {
     sid       = "ReadInbox"
-    actions   = ["dynamodb:Query"]
+    actions   = ["dynamodb:Query", "dynamodb:UpdateItem"]
     resources = [aws_dynamodb_table.inbox.arn]
+  }
+
+  statement {
+    sid       = "RequeueWork"
+    actions   = ["sqs:SendMessage"]
+    resources = [aws_sqs_queue.work.arn]
   }
 
   statement {
