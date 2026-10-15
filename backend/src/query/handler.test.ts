@@ -9,11 +9,15 @@ vi.mock('../store', async (importOriginal) => ({
   setReceiptStatus: vi.fn(),
 }))
 
+vi.mock('./auth', () => ({ verifyIdToken: vi.fn() }))
+
 import * as store from '../store'
+
+import { verifyIdToken } from './auth'
 
 import { PAGE_SIZE, SUMMARY_DAYS, handler } from './handler'
 
-const TOKEN = 'query-token'
+const TOKEN = 'id-token'
 const KEY = 'rx#2026-10-13T00:00:00.000Z#aaaaaaaa'
 const ITEM = { sortKey: KEY, rawBody: '{"a":1}', status: '완료', receivedAt: '2026-10-13T00:00:00.000Z' }
 
@@ -23,7 +27,7 @@ function request(
   return {
     rawPath: opts.path ?? '/',
     requestContext: { http: { method: opts.method ?? 'GET' } },
-    headers: opts.token === undefined ? {} : { 'x-inbox-token': opts.token },
+    headers: opts.token === undefined ? {} : { authorization: `Bearer ${opts.token}` },
     queryStringParameters: opts.cursor === undefined ? undefined : { cursor: opts.cursor },
     body: opts.body,
     isBase64Encoded: opts.base64 ?? false,
@@ -40,7 +44,7 @@ function cursorOf(sortKey: string) {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  vi.stubEnv('QUERY_TOKEN', TOKEN)
+  vi.mocked(verifyIdToken).mockImplementation(async (token) => token === TOKEN)
   vi.mocked(store.listReceipts).mockResolvedValue({ items: [ITEM] })
   vi.mocked(store.listSummaries).mockResolvedValue([])
   vi.mocked(store.requeueReceipt).mockResolvedValue(true)
@@ -62,6 +66,18 @@ describe('토큰', () => {
     expect(res.statusCode).toBe(401)
     expect(store.requeueReceipt).not.toHaveBeenCalled()
     expect(store.sendWorkBody).not.toHaveBeenCalled()
+  })
+
+  it('Bearer 형식이 아니면 검증하지 않고 401', async () => {
+    const res = await handler({ ...request(), headers: { authorization: TOKEN } })
+    expect(res.statusCode).toBe(401)
+    expect(verifyIdToken).not.toHaveBeenCalled()
+  })
+
+  it('서명 키를 받지 못하면 500', async () => {
+    vi.mocked(verifyIdToken).mockRejectedValueOnce(new Error('JWKS'))
+    expect((await handler(request({ token: TOKEN }))).statusCode).toBe(500)
+    expect(store.listReceipts).not.toHaveBeenCalled()
   })
 })
 
