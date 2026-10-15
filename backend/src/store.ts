@@ -213,6 +213,29 @@ export async function listReceiptStatuses(day: string): Promise<string[]> {
   return statuses
 }
 
+export async function listReceipts(
+  limit: number,
+  startSortKey?: string,
+): Promise<{ items: ReceiptItem[]; lastSortKey?: string }> {
+  const result = await db().send(
+    new QueryCommand({
+      TableName: table(),
+      KeyConditionExpression: 'inboxId = :inbox AND begins_with(sortKey, :prefix)',
+      ProjectionExpression: 'sortKey, rawBody, #status, receivedAt',
+      ExpressionAttributeNames: { '#status': 'status' },
+      ExpressionAttributeValues: { ':inbox': INBOX_ID, ':prefix': 'rx#' },
+      ScanIndexForward: false,
+      Limit: limit,
+      ExclusiveStartKey: startSortKey ? { inboxId: INBOX_ID, sortKey: startSortKey } : undefined,
+    }),
+  )
+  const last = result.LastEvaluatedKey?.sortKey
+  return {
+    items: (result.Items ?? []) as ReceiptItem[],
+    ...(typeof last === 'string' ? { lastSortKey: last } : {}),
+  }
+}
+
 export async function putSummary(
   day: string,
   counts: Record<string, number>,
