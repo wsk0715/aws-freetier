@@ -50,3 +50,9 @@ variable "dynamodb_read_capacity" {
   type        = number
   default     = 5
 }
+
+variable "github_repository" {
+  description = "수신함 UI를 배포하는 GitHub 저장소 (소유자/이름)."
+  type        = string
+  default     = "wsk0715/aws-freetier"
+}
