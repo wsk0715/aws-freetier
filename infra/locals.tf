@@ -22,4 +22,7 @@ locals {
 
   # 매일 00:07 UTC (09:07 KST)에 운영 작업을 실행한다.
   schedule_expression = "cron(7 0 * * ? *)"
+
+  # 수신함 UI 출처. 조회 API CORS와 로그인 콜백이 같은 값을 쓴다.
+  site_origin = var.allowed_origin != "" ? var.allowed_origin : "https://${aws_cloudfront_distribution.site.domain_name}"
 }
