@@ -12,9 +12,9 @@ resource "aws_cognito_user_pool" "site" {
   name           = "${local.name_prefix}-site"
   user_pool_tier = "LITE"
 
-  # 사용자는 구글 로그인으로만 생긴다.
+  # 구글 로그인으로 처음 들어온 사용자는 풀에 자동으로 생긴다. 관리자 전용 생성으로 막으면 구글 로그인도 막힌다.
   admin_create_user_config {
-    allow_admin_create_user_only = true
+    allow_admin_create_user_only = false
   }
 }
 
@@ -47,6 +47,7 @@ resource "aws_cognito_user_pool_client" "site" {
 
   # 브라우저 앱이라 비밀값 없이 PKCE로 코드를 교환한다.
   generate_secret                      = false
+  explicit_auth_flows                  = ["ALLOW_REFRESH_TOKEN_AUTH"]
   allowed_oauth_flows_user_pool_client = true
   allowed_oauth_flows                  = ["code"]
   allowed_oauth_scopes                 = ["openid", "email"]

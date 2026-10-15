@@ -55,7 +55,8 @@ export async function finishLogin(): Promise<string | undefined> {
   sessionStorage.removeItem(STATE_KEY)
   window.history.replaceState(null, '', '/')
 
-  if (error || !code || !verifier || params.get('state') !== state) {
+  if (error) throw new Error(`로그인이 거절되었습니다: ${params.get('error_description') ?? error}`)
+  if (!code || !verifier || params.get('state') !== state) {
     throw new Error('로그인이 완료되지 않았습니다. 다시 로그인하세요.')
   }
 
