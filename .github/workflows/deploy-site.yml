@@ -40,6 +40,8 @@ jobs:
       - run: pnpm --filter frontend build
         env:
           VITE_QUERY_API_URL: ${{ vars.VITE_QUERY_API_URL }}
+          VITE_COGNITO_DOMAIN: ${{ vars.VITE_COGNITO_DOMAIN }}
+          VITE_COGNITO_CLIENT_ID: ${{ vars.VITE_COGNITO_CLIENT_ID }}
 
       - uses: aws-actions/configure-aws-credentials@v6
         with:

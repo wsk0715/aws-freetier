@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import type { FormEvent, ReactNode } from 'react'
+import type { ReactNode } from 'react'
+
+import { COGNITO_DOMAIN, finishLogin, logout, startLogin } from './auth'
 
 const API_URL = import.meta.env.VITE_QUERY_API_URL as string | undefined
-const TOKEN_KEY = 'inbox-token'
+const TOKEN_KEY = 'inbox-id-token'
 const AUTO_REFRESH_MS = 30_000
 
 type InboxItem = {
@@ -42,7 +44,7 @@ const FAILURE_REASON: Record<string, string> = {
 }
 
 const ERRORS: Record<number, string> = {
-  401: '토큰이 맞지 않습니다. 배포할 때 설정한 조회 토큰을 입력하세요.',
+  401: '로그인이 만료되었거나 허용되지 않은 계정입니다. 다시 로그인하세요.',
   400: '페이지 위치가 잘못되었습니다. 새로고침하세요.',
 }
 
@@ -59,7 +61,7 @@ async function call<T>(token: string, path: string, init: RequestInit = {}): Pro
   const url = new URL(path, API_URL)
   let res: Response
   try {
-    res = await fetch(url, { ...init, headers: { 'x-inbox-token': token, ...init.headers } })
+    res = await fetch(url, { ...init, headers: { authorization: `Bearer ${token}`, ...init.headers } })
   } catch {
     throw new ApiError('조회 API에 연결하지 못했습니다. 네트워크와 API 주소를 확인하세요.')
   }
@@ -163,6 +165,19 @@ export function App() {
   const [selectedKey, setSelectedKey] = useState<string>()
   const [auto, setAuto] = useState(false)
   const [summaries, setSummaries] = useState<DailySummary[]>([])
+  const [signingIn, setSigningIn] = useState(() => /[?&](code|error)=/.test(window.location.search))
+
+  useEffect(() => {
+    if (!signingIn) return
+    finishLogin()
+      .then((t) => {
+        if (!t) return
+        saveToken(t)
+        setToken(t)
+      })
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : '로그인에 실패했습니다.'))
+      .finally(() => setSigningIn(false))
+  }, [signingIn])
 
   const load = useCallback(
     async (next?: string) => {
@@ -225,20 +240,29 @@ export function App() {
 
   const selected = rows.find((r) => r.key === selectedKey)
 
-  if (!API_URL) {
+  if (!API_URL || !COGNITO_DOMAIN) {
     return (
       <Gate>
-        <h1>조회 API 주소가 없습니다</h1>
+        <h1>조회 API 또는 로그인 설정이 없습니다</h1>
         <p>
-          <code>frontend/.env</code>에 <code>VITE_QUERY_API_URL</code>을 채운 뒤 다시 빌드하세요. 값은 Terraform
-          출력 <code>query_url</code>입니다.
+          <code>frontend/.env</code>에 <code>VITE_QUERY_API_URL</code>, <code>VITE_COGNITO_DOMAIN</code>,{' '}
+          <code>VITE_COGNITO_CLIENT_ID</code>를 채운 뒤 다시 빌드하세요. 값은 Terraform 출력 <code>query_url</code>,{' '}
+          <code>cognito_domain</code>, <code>cognito_client_id</code>입니다.
         </p>
       </Gate>
     )
   }
 
+  if (signingIn) {
+    return (
+      <Gate>
+        <p>로그인하는 중입니다.</p>
+      </Gate>
+    )
+  }
+
   if (!token) {
-    return <Connect error={error} onSubmit={(t) => (saveToken(t), setToken(t))} />
+    return <Connect error={error} />
   }
 
   const attention = (counts['실패'] ?? 0) + (counts['격리'] ?? 0)
@@ -267,11 +291,10 @@ export function App() {
             className="quiet"
             onClick={() => {
               saveToken('')
-              setToken('')
-              setRows([])
+              logout()
             }}
           >
-            연결 해제
+            로그아웃
           </button>
         </div>
       </header>
@@ -659,34 +682,20 @@ function Summaries({ summaries }: { summaries: DailySummary[] }) {
   )
 }
 
-function Connect({ error, onSubmit }: { error: string; onSubmit: (token: string) => void }) {
-  const [value, setValue] = useState('')
-  function submit(e: FormEvent) {
-    e.preventDefault()
-    if (value.trim()) onSubmit(value.trim())
-  }
+function Connect({ error }: { error: string }) {
   return (
     <Gate>
       <h1>웹훅 수신함</h1>
-      <p>받은 웹훅과 처리 상태를 봅니다. 조회 토큰을 입력해 연결하세요.</p>
-      <form onSubmit={submit} className="connect">
-        <label htmlFor="token">조회 토큰</label>
-        <input
-          id="token"
-          type="password"
-          autoComplete="off"
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          required
-        />
-        <button type="submit">연결</button>
-      </form>
+      <p>받은 웹훅과 처리 상태를 봅니다. 허용된 구글 계정으로 로그인하세요.</p>
+      <button type="button" onClick={() => void startLogin()}>
+        구글 계정으로 로그인
+      </button>
       {error && (
         <p className="banner" role="alert">
           {error}
         </p>
       )}
-      <p className="hint">토큰은 이 탭을 닫을 때까지만 기억합니다.</p>
+      <p className="hint">로그인은 이 탭을 닫거나 한 시간이 지나면 풀립니다.</p>
     </Gate>
   )
 }

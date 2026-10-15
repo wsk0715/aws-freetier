@@ -647,26 +647,6 @@ td.type {
   font-weight: 700;
 }
 
-.connect {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 8px;
-  margin-top: 8px;
-}
-
-.connect label {
-  grid-column: 1 / -1;
-  font-weight: 500;
-  font-size: 0.9rem;
-}
-
-.connect input {
-  padding: 0.5rem 0.75rem;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: var(--surface);
-}
-
 @media (max-width: 1080px) {
   .workspace {
     grid-template-columns: 1fr;

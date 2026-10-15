@@ -195,9 +195,11 @@ resource "aws_lambda_function" "query" {
 
   environment {
     variables = {
-      INBOX_TABLE    = aws_dynamodb_table.inbox.name
-      QUERY_TOKEN    = var.query_token
-      WORK_QUEUE_URL = aws_sqs_queue.work.url
+      INBOX_TABLE       = aws_dynamodb_table.inbox.name
+      WORK_QUEUE_URL    = aws_sqs_queue.work.url
+      COGNITO_ISSUER    = "https://${aws_cognito_user_pool.site.endpoint}"
+      COGNITO_CLIENT_ID = aws_cognito_user_pool_client.site.id
+      ALLOWED_EMAIL     = var.allowed_email
     }
   }
 
@@ -210,9 +212,9 @@ resource "aws_lambda_function_url" "query" {
 
   cors {
     allow_credentials = false
-    allow_headers     = ["content-type", "x-inbox-token"]
+    allow_headers     = ["content-type", "authorization"]
     allow_methods     = ["GET", "POST"]
-    allow_origins     = [var.allowed_origin != "" ? var.allowed_origin : "https://${aws_cloudfront_distribution.site.domain_name}"]
+    allow_origins     = [local.site_origin]
     max_age           = 300
   }
 }

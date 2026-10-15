@@ -4,19 +4,24 @@ variable "region" {
 }
 
 variable "receive_path_secret" {
-  description = "수신 Function URL 뒤에 붙는 비밀 경로 조각. 추측 불가능한 값이어야 하며 조회 토큰과 다른 값을 쓴다."
+  description = "수신 Function URL 뒤에 붙는 비밀 경로 조각. 추측 불가능한 값이어야 하며 서명 비밀값과 다른 값을 쓴다."
   type        = string
   sensitive   = true
 }
 
-variable "query_token" {
-  description = "조회 API가 요구하는 비밀 토큰. 수신 경로 비밀값과 다른 값을 쓴다."
+variable "allowed_email" {
+  description = "수신함 UI에 로그인할 수 있는 구글 계정 이메일. 공개 저장소에 남기지 않도록 tfvars나 환경변수로 넘긴다."
   type        = string
-  sensitive   = true
+}
+
+variable "cognito_domain_prefix" {
+  description = "Cognito 로그인 도메인 접두사. 리전 안에서 유일해야 하며, 구글 OAuth 클라이언트의 리디렉션 URI에 들어간다."
+  type        = string
+  default     = "abyss-webhook-inbox"
 }
 
 variable "webhook_signing_secret" {
-  description = "웹훅 본문 서명을 검증하는 HMAC 키. 수신 경로 비밀값·조회 토큰과 다른 값을 쓴다."
+  description = "웹훅 본문 서명을 검증하는 HMAC 키. 수신 경로 비밀값과 다른 값을 쓴다."
   type        = string
   sensitive   = true
 }

@@ -1,11 +1,10 @@
-import { timingSafeEqual } from 'node:crypto'
-
 import type { ReceiptItem } from '../store'
+
+import { verifyIdToken } from './auth'
 import {
   listReceipts,
   listSummaries,
   requeueReceipt,
-  requiredEnv,
   sendWorkBody,
   setReceiptStatus,
 } from '../store'
@@ -42,11 +41,9 @@ function reply(statusCode: number, payload: unknown): QueryResponse {
   return { statusCode, headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload) }
 }
 
-function tokenMatches(given: string | undefined): boolean {
-  if (given === undefined) return false
-  const a = Buffer.from(given)
-  const b = Buffer.from(requiredEnv('QUERY_TOKEN'))
-  return a.length === b.length && timingSafeEqual(a, b)
+async function authorized(header: string | undefined): Promise<boolean> {
+  const token = header?.startsWith('Bearer ') ? header.slice('Bearer '.length) : undefined
+  return token !== undefined && verifyIdToken(token, Math.floor(Date.now() / 1000))
 }
 
 function toInboxItem(item: ReceiptItem): InboxItem | undefined {
@@ -135,7 +132,12 @@ async function reprocess(event: QueryRequest): Promise<QueryResponse> {
 
 export const handler = async (event: QueryRequest): Promise<QueryResponse> => {
   // Function URL은 헤더 이름을 소문자로 넘긴다.
-  if (!tokenMatches(event.headers?.['x-inbox-token'])) return reply(401, { status: 'unauthorized' })
+  try {
+    if (!(await authorized(event.headers?.authorization))) return reply(401, { status: 'unauthorized' })
+  } catch {
+    console.error('로그인 토큰 서명 키를 받지 못했다')
+    return reply(500, { status: 'error' })
+  }
 
   const method = event.requestContext?.http?.method
   const route = { '/': ['GET', listInbox], '/summaries': ['GET', summaries], '/reprocess': ['POST', reprocess] } as const

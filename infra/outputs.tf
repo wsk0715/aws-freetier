@@ -32,3 +32,13 @@ output "site_deploy_role_arn" {
   description = "GitHub Actions 배포 워크플로가 맡는 역할. 저장소 변수 AWS_DEPLOY_ROLE_ARN에 넣는다."
   value       = aws_iam_role.site_deploy.arn
 }
+
+output "cognito_domain" {
+  description = "로그인 도메인. 프런트엔드 VITE_COGNITO_DOMAIN에 넣는다."
+  value       = "https://${aws_cognito_user_pool_domain.site.domain}.auth.${var.region}.amazoncognito.com"
+}
+
+output "cognito_client_id" {
+  description = "수신함 UI 앱 클라이언트. 프런트엔드 VITE_COGNITO_CLIENT_ID에 넣는다."
+  value       = aws_cognito_user_pool_client.site.id
+}
