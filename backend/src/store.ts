@@ -1,10 +1,16 @@
 import { ConditionalCheckFailedException, DynamoDBClient } from '@aws-sdk/client-dynamodb'
 import { PublishCommand, SNSClient } from '@aws-sdk/client-sns'
-import { SendMessageCommand, SQSClient } from '@aws-sdk/client-sqs'
+import {
+  DeleteMessageCommand,
+  ReceiveMessageCommand,
+  SendMessageCommand,
+  SQSClient,
+} from '@aws-sdk/client-sqs'
 import {
   DynamoDBDocumentClient,
   GetCommand,
   PutCommand,
+  QueryCommand,
   UpdateCommand,
 } from '@aws-sdk/lib-dynamodb'
 
@@ -40,6 +46,12 @@ export function eventKey(eventId: string): string {
 export function historyKey(eventId: string): string {
   return `his#${eventId}`
 }
+
+export function summaryKey(day: string): string {
+  return `sum#${day}`
+}
+
+export type DeadLetter = { receiptHandle: string; body: string }
 
 export function expiry(at: Date, retentionDays: number): number {
   return Math.floor(at.getTime() / 1000) + retentionDays * 86400
@@ -155,6 +167,72 @@ export async function sendWorkMessage(receiptSortKey: string): Promise<void> {
     new SendMessageCommand({
       QueueUrl: requiredEnv('WORK_QUEUE_URL'),
       MessageBody: JSON.stringify({ receiptKey: receiptSortKey }),
+    }),
+  )
+}
+
+export async function sendWorkBody(body: string): Promise<void> {
+  sqs ??= new SQSClient({})
+  await sqs.send(new SendMessageCommand({ QueueUrl: requiredEnv('WORK_QUEUE_URL'), MessageBody: body }))
+}
+
+export async function receiveDeadLetters(): Promise<DeadLetter[]> {
+  sqs ??= new SQSClient({})
+  const result = await sqs.send(
+    new ReceiveMessageCommand({ QueueUrl: requiredEnv('DLQ_URL'), MaxNumberOfMessages: 10 }),
+  )
+  return (result.Messages ?? []).flatMap((m) =>
+    m.ReceiptHandle && m.Body !== undefined ? [{ receiptHandle: m.ReceiptHandle, body: m.Body }] : [],
+  )
+}
+
+export async function deleteDeadLetter(receiptHandle: string): Promise<void> {
+  sqs ??= new SQSClient({})
+  await sqs.send(
+    new DeleteMessageCommand({ QueueUrl: requiredEnv('DLQ_URL'), ReceiptHandle: receiptHandle }),
+  )
+}
+
+export async function listReceiptStatuses(day: string): Promise<string[]> {
+  const statuses: string[] = []
+  let startKey: Record<string, unknown> | undefined
+  do {
+    const result = await db().send(
+      new QueryCommand({
+        TableName: table(),
+        KeyConditionExpression: 'inboxId = :inbox AND begins_with(sortKey, :prefix)',
+        ProjectionExpression: '#status',
+        ExpressionAttributeNames: { '#status': 'status' },
+        ExpressionAttributeValues: { ':inbox': INBOX_ID, ':prefix': `rx#${day}` },
+        ExclusiveStartKey: startKey,
+      }),
+    )
+    for (const item of result.Items ?? []) statuses.push(String(item.status))
+    startKey = result.LastEvaluatedKey
+  } while (startKey)
+  return statuses
+}
+
+export async function putSummary(
+  day: string,
+  counts: Record<string, number>,
+  redriven: number,
+  quarantined: number,
+  at: Date,
+): Promise<void> {
+  await db().send(
+    new PutCommand({
+      TableName: table(),
+      Item: {
+        inboxId: INBOX_ID,
+        sortKey: summaryKey(day),
+        day,
+        counts,
+        redriven,
+        quarantined,
+        summarizedAt: at.toISOString(),
+        expiresAt: expiry(at, retentionDays()),
+      },
     }),
   )
 }
