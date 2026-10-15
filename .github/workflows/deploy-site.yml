@@ -1,0 +1,63 @@
+name: deploy-site
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'frontend/**'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/deploy-site.yml'
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: deploy-site
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      SITE_BUCKET: ${{ vars.SITE_BUCKET }}
+      DISTRIBUTION_ID: ${{ vars.CLOUDFRONT_DISTRIBUTION_ID }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm --filter frontend build
+        env:
+          VITE_QUERY_API_URL: ${{ vars.VITE_QUERY_API_URL }}
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ap-northeast-2
+
+      # 해시가 붙은 자산은 오래 캐시하고, index.html은 매번 새로 확인하게 한다.
+      - name: Upload assets
+        run: >
+          aws s3 sync frontend/dist "s3://$SITE_BUCKET" --delete
+          --exclude index.html
+          --cache-control "public, max-age=31536000, immutable"
+
+      - name: Upload index.html
+        run: >
+          aws s3 cp frontend/dist/index.html "s3://$SITE_BUCKET/index.html"
+          --cache-control "no-cache"
+          --content-type "text/html; charset=utf-8"
+
+      - name: Invalidate index.html
+        run: aws cloudfront create-invalidation --distribution-id "$DISTRIBUTION_ID" --paths /index.html
