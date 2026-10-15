@@ -5,7 +5,22 @@ const API_URL = import.meta.env.VITE_QUERY_API_URL as string | undefined
 const TOKEN_KEY = 'inbox-token'
 const AUTO_REFRESH_MS = 30_000
 
-type InboxItem = { key: string; receivedAt: string; status: string; rawBody: string }
+type InboxItem = {
+  key: string
+  receivedAt: string
+  status: string
+  rawBody: string
+  failureReason?: string
+  requeueCount?: number
+  requeuedAt?: string
+}
+type DailySummary = {
+  day: string
+  counts: Record<string, number>
+  redriven: number
+  quarantined: number
+  summarizedAt: string
+}
 type Page = { items: InboxItem[]; nextCursor?: string }
 type Row = InboxItem & { eventId?: string; eventType?: string; bytes: number; json?: unknown }
 
@@ -16,6 +31,14 @@ const STATUS_HINT: Record<string, string> = {
   실패: '형식 오류로 처리에 실패해 재시도 중인 건',
   격리: '자동 재처리 후에도 실패해 멈춘 건',
   중복: '같은 이벤트 id가 이미 처리된 건',
+}
+
+const FAILURE_REASON: Record<string, string> = {
+  invalid_json: '본문이 JSON이 아닙니다',
+  not_an_object: '본문이 JSON 객체가 아닙니다',
+  invalid_id: 'id가 없거나 빈 문자열입니다',
+  invalid_type: 'type이 없거나 빈 문자열입니다',
+  missing_data: 'data 필드가 없습니다',
 }
 
 const ERRORS: Record<number, string> = {
@@ -32,17 +55,39 @@ class ApiError extends Error {
   }
 }
 
-async function fetchPage(token: string, cursor?: string): Promise<Page> {
-  const url = new URL(API_URL ?? '')
-  if (cursor) url.searchParams.set('cursor', cursor)
+async function call<T>(token: string, path: string, init: RequestInit = {}): Promise<T> {
+  const url = new URL(path, API_URL)
   let res: Response
   try {
-    res = await fetch(url, { headers: { 'x-inbox-token': token } })
+    res = await fetch(url, { ...init, headers: { 'x-inbox-token': token, ...init.headers } })
   } catch {
     throw new ApiError('조회 API에 연결하지 못했습니다. 네트워크와 API 주소를 확인하세요.')
   }
-  if (!res.ok) throw new ApiError(ERRORS[res.status] ?? `조회에 실패했습니다 (HTTP ${res.status}).`, res.status)
-  return (await res.json()) as Page
+  if (!res.ok) throw new ApiError(ERRORS[res.status] ?? `요청에 실패했습니다 (HTTP ${res.status}).`, res.status)
+  return (await res.json()) as T
+}
+
+function fetchPage(token: string, cursor?: string): Promise<Page> {
+  return call<Page>(token, cursor ? `./?cursor=${encodeURIComponent(cursor)}` : './')
+}
+
+async function fetchSummaries(token: string): Promise<DailySummary[]> {
+  return (await call<{ summaries: DailySummary[] }>(token, 'summaries')).summaries
+}
+
+async function requestReprocess(token: string, key: string): Promise<void> {
+  try {
+    await call(token, 'reprocess', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ key }),
+    })
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 409) {
+      throw new ApiError('이미 격리 상태가 아닙니다. 새로고침해 현재 상태를 확인하세요.', 409)
+    }
+    throw e
+  }
 }
 
 function toRow(item: InboxItem): Row {
@@ -117,6 +162,7 @@ export function App() {
   const [query, setQuery] = useState('')
   const [selectedKey, setSelectedKey] = useState<string>()
   const [auto, setAuto] = useState(false)
+  const [summaries, setSummaries] = useState<DailySummary[]>([])
 
   const load = useCallback(
     async (next?: string) => {
@@ -124,10 +170,14 @@ export function App() {
       setLoading(true)
       setError('')
       try {
-        const page = await fetchPage(token, next)
+        const [page, days] = await Promise.all([
+          fetchPage(token, next),
+          next ? undefined : fetchSummaries(token),
+        ])
         const fresh = page.items.map(toRow)
         setRows((prev) => (next ? [...prev, ...fresh] : fresh))
         setCursor(page.nextCursor)
+        if (days) setSummaries(days)
         setLoadedAt(Date.now())
       } catch (e) {
         const err = e instanceof ApiError ? e : new ApiError('조회에 실패했습니다.')
@@ -354,8 +404,26 @@ export function App() {
           )}
         </section>
 
-        <Detail row={selected} now={now} onClose={() => setSelectedKey(undefined)} />
+        <Detail
+          row={selected}
+          now={now}
+          onClose={() => setSelectedKey(undefined)}
+          onReprocess={async (key) => {
+            await requestReprocess(token, key)
+            setRows((prev) =>
+              prev.map((r) =>
+                r.key === key
+                  ? { ...r, status: '수신됨', requeueCount: (r.requeueCount ?? 0) + 1, requeuedAt: new Date().toISOString() }
+                  : r,
+              ),
+            )
+            // 워커가 처리할 시간을 두고 결과를 다시 읽는다.
+            setTimeout(() => void load(), 5000)
+          }}
+        />
       </div>
+
+      <Summaries summaries={summaries} />
     </div>
   )
 }
@@ -406,9 +474,26 @@ function Ribbon({
   )
 }
 
-function Detail({ row, now, onClose }: { row?: Row; now: number; onClose: () => void }) {
+function Detail({
+  row,
+  now,
+  onClose,
+  onReprocess,
+}: {
+  row?: Row
+  now: number
+  onClose: () => void
+  onReprocess: (key: string) => Promise<void>
+}) {
   const [copied, setCopied] = useState(false)
-  useEffect(() => setCopied(false), [row?.key])
+  const [confirming, setConfirming] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [notice, setNotice] = useState('')
+  useEffect(() => {
+    setCopied(false)
+    setConfirming(false)
+    setNotice('')
+  }, [row?.key])
 
   if (!row) {
     return (
@@ -441,9 +526,70 @@ function Detail({ row, now, onClose }: { row?: Row; now: number; onClose: () => 
         <dd className="code">{row.eventId ?? '없음'}</dd>
         <dt>수신 키</dt>
         <dd className="code">{row.key}</dd>
+        {row.failureReason && (row.status === '실패' || row.status === '격리') && (
+          <>
+            <dt>실패 사유</dt>
+            <dd>
+              {FAILURE_REASON[row.failureReason] ?? row.failureReason}
+              <span className="hint code">{row.failureReason}</span>
+            </dd>
+          </>
+        )}
+        {row.requeueCount !== undefined && (
+          <>
+            <dt>수동 재처리</dt>
+            <dd>
+              {row.requeueCount}회
+              {row.requeuedAt && <span className="hint">마지막 {ago(row.requeuedAt, now)}</span>}
+            </dd>
+          </>
+        )}
         <dt>크기</dt>
         <dd>{formatBytes(row.bytes)}</dd>
       </dl>
+      {row.status === '격리' && (
+        <div className="reprocess">
+          {!confirming ? (
+            <button type="button" onClick={() => setConfirming(true)}>
+              다시 처리
+            </button>
+          ) : (
+            <div className="confirm" role="group" aria-label="다시 처리 확인">
+              <p>
+                이 건을 작업 큐에 한 번 더 넣습니다. 처리에 실패하면 자동 재처리 없이 다시 격리됩니다.
+                {row.failureReason && ' 형식 오류는 원문이 같으므로 다시 실패합니다.'}
+              </p>
+              <div className="confirm-actions">
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => {
+                    setBusy(true)
+                    setNotice('')
+                    onReprocess(row.key)
+                      .then(() => setNotice('작업 큐에 다시 넣었습니다. 몇 초 뒤 결과가 반영됩니다.'))
+                      .catch((e: unknown) => setNotice(e instanceof Error ? e.message : '다시 처리하지 못했습니다.'))
+                      .finally(() => {
+                        setBusy(false)
+                        setConfirming(false)
+                      })
+                  }}
+                >
+                  {busy ? '넣는 중…' : '다시 처리 확정'}
+                </button>
+                <button type="button" className="quiet" onClick={() => setConfirming(false)} disabled={busy}>
+                  취소
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+      {notice && (
+        <p className="notice" role="status">
+          {notice}
+        </p>
+      )}
       <div className="payload-head">
         <h3>원문</h3>
         <button
@@ -462,6 +608,54 @@ function Detail({ row, now, onClose }: { row?: Row; now: number; onClose: () => 
       {row.json === undefined && <p className="hint">JSON으로 읽을 수 없어 받은 그대로 보여줍니다.</p>}
       <pre className="payload">{pretty}</pre>
     </aside>
+  )
+}
+
+function Summaries({ summaries }: { summaries: DailySummary[] }) {
+  if (summaries.length === 0) return null
+  return (
+    <section className="summaries" aria-labelledby="summaries-title">
+      <h2 id="summaries-title">일일 요약</h2>
+      <p className="hint">매일 09:07(KST)에 운영 작업이 전날 수신 건을 상태별로 셉니다.</p>
+      <div className="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">날짜 (UTC)</th>
+              <th scope="col" className="num">
+                수신
+              </th>
+              {STATUSES.map((s) => (
+                <th key={s} scope="col" className="num">
+                  {s}
+                </th>
+              ))}
+              <th scope="col" className="num">
+                자동 재처리
+              </th>
+              <th scope="col" className="num">
+                새로 격리
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {summaries.map((d) => (
+              <tr key={d.day}>
+                <td>{d.day}</td>
+                <td className="num">{Object.values(d.counts).reduce((a, b) => a + b, 0)}</td>
+                {STATUSES.map((s) => (
+                  <td key={s} className={`num ${d.counts[s] ? `s-${s} strong` : 'sub'}`}>
+                    {d.counts[s] ?? 0}
+                  </td>
+                ))}
+                <td className="num">{d.redriven}</td>
+                <td className="num">{d.quarantined}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
   )
 }
 
