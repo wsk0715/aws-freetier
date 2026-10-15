@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>수신함</title>
+    <style>
+      :root { color-scheme: light dark; font-family: system-ui, sans-serif; }
+      main { max-width: 48rem; margin: 2rem auto; padding: 0 1rem; }
+      form { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+      input { flex: 1; min-width: 12rem; padding: 0.4rem; }
+      button { padding: 0.4rem 0.9rem; }
+      :focus-visible { outline: 3px solid #2563eb; outline-offset: 2px; }
+      [role='alert'] { color: #b91c1c; }
+      .inbox { list-style: none; padding: 0; }
+      .inbox li { border-bottom: 1px solid #8884; padding: 0.5rem 0; }
+      summary { display: flex; gap: 1rem; cursor: pointer; }
+      pre { overflow-x: auto; padding: 0.75rem; background: #8882; white-space: pre-wrap; word-break: break-all; }
+      .status { padding: 0 0.5rem; border-radius: 0.25rem; border: 1px solid currentColor; }
+      .status-완료 { color: #15803d; }
+      .status-실패, .status-격리 { color: #b91c1c; }
+      .status-수신됨 { color: #1d4ed8; }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
