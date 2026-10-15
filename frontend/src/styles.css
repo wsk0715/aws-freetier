@@ -87,6 +87,39 @@ button.quiet {
   border-color: var(--line);
 }
 
+/* Google 로그인 버튼 브랜드 지침의 표준 버튼 모양을 따른다. */
+button.google {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid #747775;
+  border-radius: 4px;
+  background: #fff;
+  color: #1f1f1f;
+  font-family: 'Roboto', sans-serif;
+  font-weight: 500;
+  font-size: 14px;
+}
+
+button.google:hover {
+  background: #f2f2f2;
+}
+
+@media (prefers-color-scheme: dark) {
+  button.google {
+    border-color: #8e918f;
+    background: #131314;
+    color: #e3e3e3;
+  }
+
+  button.google:hover {
+    background: #26272a;
+  }
+}
+
 :focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;

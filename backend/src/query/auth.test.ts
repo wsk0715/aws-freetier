@@ -20,7 +20,15 @@ function token(
   opts: { kid?: string; alg?: string; key?: typeof privateKey } = {},
 ) {
   const head = part({ alg: opts.alg ?? 'RS256', kid: opts.kid ?? 'k1' })
-  const body = part({ iss: ISSUER, aud: CLIENT, token_use: 'id', exp: NOW + 60, email: EMAIL, ...claims })
+  const body = part({
+    iss: ISSUER,
+    aud: CLIENT,
+    token_use: 'id',
+    exp: NOW + 60,
+    email: EMAIL,
+    identities: [{ providerName: 'Google' }],
+    ...claims,
+  })
   const signature = sign('sha256', Buffer.from(`${head}.${body}`), opts.key ?? privateKey).toString('base64url')
   return `${head}.${body}.${signature}`
 }
@@ -50,6 +58,7 @@ describe('ID 토큰 검증', () => {
     ['다른 앱', { aud: 'client-2' }],
     ['다른 발급자', { iss: 'https://evil.example.com' }],
     ['액세스 토큰', { token_use: 'access' }],
+    ['구글을 거치지 않은 사용자', { identities: undefined }],
   ])('%s이면 거절한다', async (_, claims) => {
     expect(await verifyIdToken(token(claims), NOW)).toBe(false)
   })
