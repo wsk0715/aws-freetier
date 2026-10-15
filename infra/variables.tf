@@ -22,9 +22,9 @@ variable "webhook_signing_secret" {
 }
 
 variable "allowed_origin" {
-  description = "조회 API의 CORS 허용 출처. 최초 적용 뒤 CloudFront 도메인으로 좁힌다."
+  description = "조회 API의 CORS 허용 출처. 비워 두면 수신함 UI의 CloudFront 주소만 허용한다."
   type        = string
-  default     = "*"
+  default     = ""
 }
 
 variable "log_retention_days" {

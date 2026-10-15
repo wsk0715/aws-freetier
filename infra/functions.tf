@@ -199,7 +199,7 @@ resource "aws_lambda_function_url" "query" {
     allow_credentials = false
     allow_headers     = ["content-type", "x-inbox-token"]
     allow_methods     = ["GET"]
-    allow_origins     = [var.allowed_origin]
+    allow_origins     = [var.allowed_origin != "" ? var.allowed_origin : "https://${aws_cloudfront_distribution.site.domain_name}"]
     max_age           = 300
   }
 }
