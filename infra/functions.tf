@@ -118,11 +118,23 @@ resource "aws_lambda_function" "history" {
   depends_on = [aws_cloudwatch_log_group.history]
 }
 
-resource "aws_lambda_event_source_mapping" "history" {
-  event_source_arn        = aws_sqs_queue.history.arn
-  function_name           = aws_lambda_function.history.arn
-  batch_size              = local.worker_batch_size
-  function_response_types = ["ReportBatchItemFailures"]
+resource "aws_lambda_permission" "history_sns" {
+  statement_id  = "AllowProcessedTopic"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.history.function_name
+  principal     = "sns.amazonaws.com"
+  source_arn    = aws_sns_topic.processed.arn
+}
+
+resource "aws_lambda_function_event_invoke_config" "history" {
+  function_name          = aws_lambda_function.history.function_name
+  maximum_retry_attempts = 2
+
+  destination_config {
+    on_failure {
+      destination = aws_sqs_queue.history_failed.arn
+    }
+  }
 }
 
 data "archive_file" "ops" {

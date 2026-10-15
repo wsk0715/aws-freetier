@@ -13,8 +13,7 @@ locals {
   query_timeout   = 10
 
   # 큐 가시성 제한은 소비 함수의 타임아웃보다 길어야 한다.
-  worker_visibility_timeout  = local.worker_timeout * 6
-  history_visibility_timeout = local.history_timeout * 6
+  worker_visibility_timeout = local.worker_timeout * 6
 
   worker_batch_size = 10
   max_receive_count = 3

@@ -90,9 +90,9 @@ data "aws_iam_policy_document" "history" {
   }
 
   statement {
-    sid       = "ConsumeHistoryQueue"
-    actions   = ["sqs:ReceiveMessage", "sqs:DeleteMessage", "sqs:GetQueueAttributes"]
-    resources = [aws_sqs_queue.history.arn]
+    sid       = "RecordFailedInvocation"
+    actions   = ["sqs:SendMessage"]
+    resources = [aws_sqs_queue.history_failed.arn]
   }
 
   statement {
