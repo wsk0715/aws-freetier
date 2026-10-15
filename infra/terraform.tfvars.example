@@ -2,16 +2,21 @@
 #
 # 비밀값은 파일에 쓰지 말고 환경변수로 넘긴다.
 #   PowerShell:  $env:TF_VAR_receive_path_secret = "..."
-#                $env:TF_VAR_query_token = "..."
 #                $env:TF_VAR_webhook_signing_secret = "..."
 #   bash:        export TF_VAR_receive_path_secret="..."
-#                export TF_VAR_query_token="..."
 #                export TF_VAR_webhook_signing_secret="..."
 #
-# 세 비밀값은 서로 다른 값을 쓴다. 민감 변수는 state에 평문으로 남을 수 있으므로
+# 두 비밀값은 서로 다른 값을 쓴다. 민감 변수는 state에 평문으로 남을 수 있으므로
 # state 파일을 추적하지 않는다.
 
 region = "ap-northeast-2"
+
+# 수신함 UI에 로그인할 구글 계정.
+# allowed_email = "you@example.com"
+#
+# 구글 OAuth 클라이언트 값은 SSM 파라미터로 둔다.
+#   /webhook-inbox/google-client-id      (String)
+#   /webhook-inbox/google-client-secret  (SecureString)
 
 # 최초 적용 뒤 출력된 CloudFront 도메인으로 좁힌다.
 # allowed_origin = "https://dxxxxxxxxxxxxx.cloudfront.net"
