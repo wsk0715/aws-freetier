@@ -27,3 +27,8 @@ output "inbox_table_name" {
   description = "수신함 테이블."
   value       = aws_dynamodb_table.inbox.name
 }
+
+output "site_deploy_role_arn" {
+  description = "GitHub Actions 배포 워크플로가 맡는 역할. 저장소 변수 AWS_DEPLOY_ROLE_ARN에 넣는다."
+  value       = aws_iam_role.site_deploy.arn
+}
