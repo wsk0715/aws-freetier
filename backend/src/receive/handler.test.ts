@@ -143,6 +143,7 @@ describe('정상 수신', () => {
         inboxId: 'inbox',
         status: '수신됨',
         rawBody: BODY,
+        headers: expect.objectContaining({ 'x-webhook-signature': expect.stringMatching(/^sha256=/) }),
         bodyBytes: Buffer.byteLength(BODY, 'utf8'),
         contentType: 'application/json',
       }),

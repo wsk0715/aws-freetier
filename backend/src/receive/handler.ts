@@ -58,6 +58,7 @@ export const handler = async (event: ReceiveRequest): Promise<ReceiveResponse> =
       status: '수신됨',
       receivedAt: receivedAt.toISOString(),
       rawBody,
+      headers: Object.fromEntries(Object.entries(headers).filter((e): e is [string, string] => e[1] !== undefined)),
       bodyBytes,
       contentType: header(headers, 'content-type') ?? 'application/octet-stream',
       expiresAt: expiry(receivedAt, Number(requiredEnv('RETENTION_DAYS'))),
