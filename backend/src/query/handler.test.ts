@@ -125,6 +125,13 @@ describe('목록', () => {
     })
   })
 
+  it('저장된 수신 헤더를 함께 돌려준다', async () => {
+    const headers = { 'content-type': 'application/json', 'x-webhook-signature': 'sha256=ab' }
+    vi.mocked(store.listReceipts).mockResolvedValue({ items: [{ ...ITEM, headers }] })
+    const res = await handler(request({ token: TOKEN }))
+    expect(JSON.parse(res.body).items[0].headers).toEqual(headers)
+  })
+
   it('결과가 없으면 빈 목록', async () => {
     vi.mocked(store.listReceipts).mockResolvedValue({ items: [] })
     const res = await handler(request({ token: TOKEN }))

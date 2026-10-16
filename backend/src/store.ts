@@ -25,6 +25,7 @@ export type BatchResult = { batchItemFailures: { itemIdentifier: string }[] }
 export type ReceiptItem = {
   sortKey: string
   rawBody: string
+  headers?: Record<string, string>
   status: string
   receivedAt: string
   failureReason?: string
@@ -91,6 +92,7 @@ export async function putReceipt(item: {
   status: string
   receivedAt: string
   rawBody: string
+  headers: Record<string, string>
   bodyBytes: number
   contentType: string
   expiresAt: number
@@ -232,7 +234,7 @@ export async function listReceipts(
     new QueryCommand({
       TableName: table(),
       KeyConditionExpression: 'inboxId = :inbox AND begins_with(sortKey, :prefix)',
-      ProjectionExpression: 'sortKey, rawBody, #status, receivedAt, failureReason, requeueCount, requeuedAt',
+      ProjectionExpression: 'sortKey, rawBody, headers, #status, receivedAt, failureReason, requeueCount, requeuedAt',
       ExpressionAttributeNames: { '#status': 'status' },
       ExpressionAttributeValues: { ':inbox': INBOX_ID, ':prefix': 'rx#' },
       ScanIndexForward: false,

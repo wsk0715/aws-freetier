@@ -12,6 +12,7 @@ type InboxItem = {
   receivedAt: string
   status: string
   rawBody: string
+  headers?: Record<string, string>
   failureReason?: string
   requeueCount?: number
   requeuedAt?: string
@@ -612,6 +613,19 @@ function Detail({
         <p className="notice" role="status">
           {notice}
         </p>
+      )}
+      {row.headers && (
+        <>
+          <div className="payload-head">
+            <h3>헤더</h3>
+          </div>
+          <pre className="payload">
+            {Object.entries(row.headers)
+              .sort(([a], [b]) => a.localeCompare(b))
+              .map(([name, value]) => `${name}: ${value}`)
+              .join('\n')}
+          </pre>
+        </>
       )}
       <div className="payload-head">
         <h3>원문</h3>
