@@ -32,6 +32,7 @@ export type InboxItem = {
   receivedAt: string
   status: string
   rawBody: string
+  headers?: Record<string, string>
   failureReason?: string
   requeueCount?: number
   requeuedAt?: string
@@ -47,13 +48,14 @@ async function authorized(header: string | undefined): Promise<boolean> {
 }
 
 function toInboxItem(item: ReceiptItem): InboxItem | undefined {
-  const { sortKey, receivedAt, status, rawBody, failureReason, requeueCount, requeuedAt } = item
+  const { sortKey, receivedAt, status, rawBody, headers, failureReason, requeueCount, requeuedAt } = item
   if ([sortKey, receivedAt, status, rawBody].some((v) => typeof v !== 'string')) return undefined
   return {
     key: sortKey,
     receivedAt,
     status,
     rawBody,
+    ...(headers && typeof headers === 'object' ? { headers } : {}),
     ...(typeof failureReason === 'string' ? { failureReason } : {}),
     ...(typeof requeueCount === 'number' ? { requeueCount } : {}),
     ...(typeof requeuedAt === 'string' ? { requeuedAt } : {}),
